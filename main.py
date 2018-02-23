@@ -34,8 +34,8 @@ class BrainD:
     def __init__(self, files):
         self._files = files
 
-    def fisher_z(self, col):
-        return [*map(lambda x: 1 / 2 * np.log((1 + x) / (1 - x)) if x != 1.0 else 0., col)]
+    def fisher_z(self, row):
+        return [*map(lambda x: 1 / 2 * np.log((1 + x) / (1 - x)) if x != 1.0 else 0., row)]
 
     def transform(self, matrix):
         return np.array([*map(self.fisher_z, matrix)])
@@ -56,12 +56,9 @@ class BrainD:
         Fs_train, Fs_test = [corr_dict[v] for v in train_ids], [
             corr_dict[v] for v in test_ids]
         Xs_train, Xs_test = np.array(Xs_train), np.array(Xs_test)
-        Fs_train, Fs_test = np.stack(
-            Fs_train, axis=2), np.stack(Fs_test, axis=2)
-        Fn_train, Fn_test = np.mean(
-            Fs_train, axis=2), np.mean(Fs_test, axis=2)
-        Xs_train, Xs_test = np.reshape(
-            Xs_train, (-1, 15)), np.reshape(Xs_test, (-1, 15))
+        Fs_train, Fs_test = np.stack(Fs_train, axis=2), np.stack(Fs_test, axis=2)
+        Fn_train, Fn_test = np.mean(Fs_train, axis=2), np.mean(Fs_test, axis=2)
+        Xs_train, Xs_test = np.reshape(Xs_train, (-1, 15)), np.reshape(Xs_test, (-1, 15))
         print("Finished extract all the matrices\n")
         return Fn_train, Fn_test, Xs_train, Xs_test, corr_dict
 
@@ -74,8 +71,7 @@ class BrainD:
 
     def svd(self, Xs_train):
         # get SVD components from train matrix
-        u, s, v = np.linalg.svd(
-            Xs_train, full_matrices=False, compute_uv=True)
+        u, s, v = np.linalg.svd(Xs_train, full_matrices=False, compute_uv=True)
         g = np.dot(np.diag(s), v)
         UG = np.dot(u, np.dot(np.diag(s), v))
         return u, g, UG
@@ -89,8 +85,7 @@ class BrainD:
     def norm(self, cov_UG, cov_Xs_train, cov_Xs_test):
         dist_UG = np.linalg.norm(cov_UG - cov_Xs_test, ord="fro")
         dist_train = np.linalg.norm(cov_Xs_train - cov_Xs_test, ord="fro")
-        print("The closeness between matrix CUG and Ctest is %.13f\nThe closeness between matrix Ctrain and Ctest is %.13f\n" % (
-            dist_UG, dist_UG))
+        print("The closeness between matrix CUG and Ctest is %.13f\nThe closeness between matrix Ctrain and Ctest is %.13f\n" % (dist_UG, dist_UG))
         print("Until here, elapsed time is %.2fs\n" % (time.time() - start))
         return dist_UG, dist_train
 
