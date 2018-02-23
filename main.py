@@ -6,23 +6,19 @@ Created on Mon Feb 19 2018
 """
 import pip
 import os
-import sys
 pkgs = ['numpy', 'scipy', 'sklearn', 'pandas']
 for package in pkgs:
     try:
         import package
     except ImportError:
         pip.main(['install', package])
-
-if os.path.basename(os.getcwd()) == "brainD15":
-    import pandas as pd
-    import numpy as np
-    import time
-    from collections import OrderedDict
-    from sklearn.preprocessing import scale
-
-else:
-    sys.eixt("You should move your python script into brainD15 folder.\n")
+    finally:
+        import sys
+        import pandas as pd
+        import numpy as np
+        import time
+        from collections import OrderedDict
+        from sklearn.preprocessing import scale
 
 
 def authors():
@@ -34,8 +30,8 @@ class BrainD:
     def __init__(self, files):
         self._files = files
 
-    def fisher_z(self, row):
-        return [*map(lambda x: 1 / 2 * np.log((1 + x) / (1 - x)) if x != 1.0 else 0., row)]
+    def fisher_z(self, col):
+        return [*map(lambda x: 1 / 2 * np.log((1 + x) / (1 - x)) if x != 1.0 else 0., col)]
 
     def transform(self, matrix):
         return np.array([*map(self.fisher_z, matrix)])
@@ -46,19 +42,24 @@ class BrainD:
         test_ids = sorted_files[410:820]
 
         corr_dict = OrderedDict()  # remain the order in Dict
+        Xs_train, Xs_test = [], []
         for i, v in enumerate(sorted_files):
             dat = pd.read_table(v, sep=" ", header=None)
             corr_dict[v] = self.transform(np.array(dat.corr()))
-
-        Xs_train, Xs_test = [scale(pd.read_table(v, sep=" ", header=None)) for v in train_ids], [
-            scale(pd.read_table(v, sep=" ", header=None)) for v in test_ids]
-
+            if i <= 409:
+                Xs_train.append(scale(dat))
+            else:
+                Xs_test.append(scale(dat))
+        
         Fs_train, Fs_test = [corr_dict[v] for v in train_ids], [
             corr_dict[v] for v in test_ids]
         Xs_train, Xs_test = np.array(Xs_train), np.array(Xs_test)
-        Fs_train, Fs_test = np.stack(Fs_train, axis=2), np.stack(Fs_test, axis=2)
-        Fn_train, Fn_test = np.mean(Fs_train, axis=2), np.mean(Fs_test, axis=2)
-        Xs_train, Xs_test = np.reshape(Xs_train, (-1, 15)), np.reshape(Xs_test, (-1, 15))
+        Fs_train, Fs_test = np.stack(
+            Fs_train, axis=2), np.stack(Fs_test, axis=2)
+        Fn_train, Fn_test = np.mean(
+            Fs_train, axis=2), np.mean(Fs_test, axis=2)
+        Xs_train, Xs_test = np.reshape(
+            Xs_train, (-1, 15)), np.reshape(Xs_test, (-1, 15))
         print("Finished extract all the matrices\n")
         return Fn_train, Fn_test, Xs_train, Xs_test, corr_dict
 
@@ -71,7 +72,8 @@ class BrainD:
 
     def svd(self, Xs_train):
         # get SVD components from train matrix
-        u, s, v = np.linalg.svd(Xs_train, full_matrices=False, compute_uv=True)
+        u, s, v = np.linalg.svd(
+            Xs_train, full_matrices=False, compute_uv=True)
         g = np.dot(np.diag(s), v)
         UG = np.dot(u, np.dot(np.diag(s), v))
         return u, g, UG
@@ -85,7 +87,7 @@ class BrainD:
     def norm(self, cov_UG, cov_Xs_train, cov_Xs_test):
         dist_UG = np.linalg.norm(cov_UG - cov_Xs_test, ord="fro")
         dist_train = np.linalg.norm(cov_Xs_train - cov_Xs_test, ord="fro")
-        print("The closeness between matrix CUG and Ctest is %.13f\nThe closeness between matrix Ctrain and Ctest is %.13f\n" % (dist_UG, dist_UG))
+        print("The closeness between matrix CUG and Ctest is %f\nThe closeness between matrix Ctrain and Ctest is %f\n" % (dist_UG, dist_UG))
         print("Until here, elapsed time is %.2fs\n" % (time.time() - start))
         return dist_UG, dist_train
 
@@ -110,7 +112,10 @@ class BrainD:
 if __name__ == "__main__":
     print("HW2 started...\n")
     start = time.time()
-    authors()
+    if os.path.basename(os.getcwd()) == "brainD15":
+        authors()
+    else:
+        sys.exit("You should move your python script into brainD15 folder!\n")
     # extract only .txt file in current path
     files = [s for s in os.listdir(os.getcwd()) if s.endswith(".txt")]
     hw2 = BrainD(files)
