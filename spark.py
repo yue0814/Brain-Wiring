@@ -64,7 +64,7 @@ def main(sc):
     cov_UG = np.cov(UG.T)
     dist_UG = np.array(np.linalg.norm(cov_UG - cov_Xs_test, ord="fro")).reshape(1, 1)
     dist_train = np.array(np.linalg.norm(cov_Xs_train - cov_Xs_test, ord="fro")).reshape(1, 1)
-    print("The closeness between matrix CUG and Ctest is %d\nThe closeness between matrix Ctrain and Ctest is %d\n" % (dist_UG, dist_UG))
+    print("The closeness between matrix CUG and Ctest is %f\nThe closeness between matrix Ctrain and Ctest is %f\n" % (dist_UG, dist_UG))
     print("Until here, elapsed time is %.2fs\n" % (time.time() - start))
     np.savetxt("U.csv", u, delimiter=",")
     np.savetxt("G.csv", g, delimiter=",")
