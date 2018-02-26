@@ -111,14 +111,13 @@ class BrainD:
 
 if __name__ == "__main__":
     print("HW2 started...\n")
-    start = time.time()
+    
     if os.path.basename(os.getcwd()) == "brainD15":
         authors()
+        start = time.time()
+        files = [s for s in os.listdir(os.getcwd()) if s.endswith(".txt")]
+        hw2 = BrainD(files)
+        hw2.main()
+        print("HW2 was done!\nElapsed time is %.2fs" % (time.time() - start))
     else:
         sys.exit("You should move your python script into brainD15 folder!\n")
-    # extract only .txt file in current path
-    files = [s for s in os.listdir(os.getcwd()) if s.endswith(".txt")]
-    hw2 = BrainD(files)
-    hw2.main()
-    print("HW2 was done!\nElapsed time is %.2fs" % (time.time() - start))
-
