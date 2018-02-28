@@ -50,7 +50,7 @@ class BrainD:
                 Xs_train.append(scale(dat))
             else:
                 Xs_test.append(scale(dat))
-        
+
         Fs_train, Fs_test = [corr_dict[v] for v in train_ids], [
             corr_dict[v] for v in test_ids]
         Xs_train, Xs_test = np.array(Xs_train), np.array(Xs_test)
@@ -111,7 +111,6 @@ class BrainD:
 
 if __name__ == "__main__":
     print("HW2 started...\n")
-    
     if os.path.basename(os.getcwd()) == "brainD15":
         authors()
         start = time.time()

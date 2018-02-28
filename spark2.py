@@ -30,7 +30,6 @@ from pyspark import StorageLevel
 # from pyspark.sql import DataFrame
 
 
-
 def authors():
     print("@authors: Yue Peng, Ludan Zhang, Jiachen Zhang\n")
 

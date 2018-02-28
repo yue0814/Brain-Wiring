@@ -7,6 +7,7 @@ Created on Mon Feb 19 2018
 import pip
 import os
 import time
+import sys
 from collections import OrderedDict
 pkgs = ['numpy', 'scipy', 'sklearn', 'pandas']
 for package in pkgs:
@@ -80,7 +81,7 @@ if __name__ == "__main__":
     if os.path.basename(os.getcwd()) == "brainD15":
         authors()
     else:
-        print("You should move your python script into brainD15 folder.\n")
+        sys.exit("You should move your python script into brainD15 folder.\n")
     # extract only .txt file in current path
     files = [s for s in os.listdir(os.getcwd()) if s.endswith(".txt")]
     hw2 = BrainD(files)
