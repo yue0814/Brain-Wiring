@@ -37,14 +37,14 @@ class BrainD:
         return pd.read_table(file, sep=" ", header=None)
 
     def process(self, df):
-        corr_mat = np.asarray(df.corr()).tolist()
+        corr_mat = np.asarray(df.corr()).astype("float64").tolist()
         return [*map(self.fisher_z, corr_mat)]
 
     def scaling(self, df):
         return scale(df).tolist()
 
     def save_csv(self, name):
-        np.savetxt("%s.csv" % (name), files_to_save[name], delimiter=",")
+        np.savetxt("%s.csv" % (name), files_to_save[name], delimiter=",", fmt="%f")
 
     def main(self):
         global files_to_save
@@ -52,25 +52,24 @@ class BrainD:
         pool = ThreadPool(4)  # current cpu processes number
         train_dfs = pool.map(self.read_txt, self._files[0:410])
         test_dfs = pool.map(self.read_txt, self._files[410:820])
-        Fs_train = np.array(pool.map(self.process, train_dfs)).reshape(410, 15, 15)
-        Fs_test = np.array(pool.map(self.process, test_dfs)).reshape(410, 15, 15)
+        Fs_train = np.array(pool.map(self.process, train_dfs)).reshape(410, 15, 15).astype("float64")
+        Fs_test = np.array(pool.map(self.process, test_dfs)).reshape(410, 15, 15).astype("float64")
         Fs = np.concatenate((Fs_train, Fs_test), axis=0)
         files_to_save["Fn"], files_to_save["Fv"] = np.mean(Fs, axis=0), np.var(Fs, axis=0)
 
         files_to_save["Ftrain"], files_to_save["Ftest"] = np.mean(Fs_train, axis=0), np.mean(Fs_test, axis=0)
-        Xs_train = np.array(pool.map(self.scaling, train_dfs)).reshape(-1, 15)
-        Xs_test = np.array(pool.map(self.scaling, test_dfs)).reshape(-1, 15)
+        Xs_train = np.array(pool.map(self.scaling, train_dfs)).reshape(-1, 15).astype("float64")
+        Xs_test = np.array(pool.map(self.scaling, test_dfs)).reshape(-1, 15).astype("float64")
         cov_Xs_train, cov_Xs_test = np.cov(Xs_train.T), np.cov(Xs_test.T)
         files_to_save["U"], s, v = np.linalg.svd(Xs_train, full_matrices=False, compute_uv=True)
-        files_to_save["G"] = np.dot(np.diag(s), v)
-        UG = np.dot(files_to_save["U"], np.dot(np.diag(s), v))
+        files_to_save["G"] = np.dot(np.diag(s), v).astype("float64")
+        UG = np.dot(files_to_save["U"], np.dot(np.diag(s), v)).astype("float64")
         files_to_save["CUG"] = np.cov(UG.T)
         files_to_save["CUGCtest"] = np.array(np.linalg.norm(files_to_save["CUG"] - cov_Xs_test, ord="fro")).reshape(1, 1)
         files_to_save["CtrainCtest"] = np.array(np.linalg.norm(cov_Xs_train - cov_Xs_test, ord="fro")).reshape(1, 1)
         print("The closeness between matrix CUG and Ctest is    %.32f\nThe closeness between matrix Ctrain and Ctest is %.32f\n" % (files_to_save["CUGCtest"], files_to_save["CtrainCtest"]))
         print("Until here, elapsed time is %.2fs" % (time.time() - start))
         pool.map(self.save_csv, files_to_save.keys())
-        print("HW2 was done!\nElapsed time is %.2fs" % (time.time() - start))
         pool.close()
         pool.join()
 
@@ -86,3 +85,4 @@ if __name__ == "__main__":
     files = [s for s in os.listdir(os.getcwd()) if s.endswith(".txt")]
     hw2 = BrainD(files)
     hw2.main()
+    print("HW2 was done!\nElapsed time is %.2fs" % (time.time() - start))
