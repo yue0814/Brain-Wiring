@@ -7,6 +7,7 @@ Created on Mon Feb 19 2018
 import pip
 import os
 import time
+from collections import OrderedDict
 pkgs = ['numpy', 'scipy', 'sklearn', 'pandas']
 for package in pkgs:
     try:
@@ -17,8 +18,7 @@ for package in pkgs:
         import numpy as np
         import pandas as pd
         from sklearn.preprocessing import scale
-        from operator import add
-        from functools import reduce
+        from multiprocessing.dummy import Pool as ThreadPool
 
 
 def authors():
@@ -31,53 +31,48 @@ class BrainD:
         self._files = sorted(files)
 
     def fisher_z(self, row):
-        return [(lambda x: 1 / 2 * np.log((1 + x) / (1 - x)) if x != 1.0 else 0.)(i) for i in row]
+        return [*map(lambda x: 1 / 2 * np.log((1 + x) / (1 - x)) if x != 1.0 else 0., row)]
 
-    def process(self, file):
-        df = pd.read_table(file, sep=" ", header=None)
-        corr_mat = np.asarray(df.corr()).tolist()
-        return [self.fisher_z(i) for i in corr_mat]
+    def read_txt(self, file):
+        return pd.read_table(file, sep=" ", header=None)
 
-    def scaling(self, file):
-        X = scale(pd.read_table(file, sep=" ", header=None)).tolist()
-        return X
+    def process(self, df):
+        corr_mat = np.asarray(df.corr()).astype("float64").tolist()
+        return [*map(self.fisher_z, corr_mat)]
+
+    def scaling(self, df):
+        return scale(df).tolist()
+
+    def save_csv(self, name):
+        np.savetxt("%s.csv" % (name), files_to_save[name], delimiter=",", fmt="%f")
 
     def main(self):
-        corr_new = [self.process(f) for f in self._files]
-        Fs = np.array(reduce(add, corr_new)).reshape(820, 15, 15)
-        Fs = np.stack(Fs, axis=2)
-        Fn, Fv = np.mean(Fs, axis=2), np.var(Fs, axis=2)
-        np.savetxt("Fn.csv", Fn, delimiter=",")
-        np.savetxt("Fv.csv", Fv, delimiter=",")
-        train_files = self._files[0:410]
-        test_files = self._files[410:820]
-        corr_new_train = corr_new[0:410]
-        corr_new_test = corr_new[410:820]
-        Fs_train = np.array(reduce(add, corr_new_train)).reshape(410, 15, 15)
-        Fs_test = np.array(reduce(add, corr_new_test)).reshape(410, 15, 15)
-        Fs_train, Fs_test = np.stack(Fs_train, axis=2), np.stack(Fs_test, axis=2)
-        Ftrain, Ftest = np.mean(Fs_train, axis=2), np.mean(Fs_test, axis=2)
-        np.savetxt("Ftrain.csv", Ftrain, delimiter=",")
-        np.savetxt("Ftest.csv", Ftest, delimiter=",")
-        Xs_train = np.array(reduce(add, [self.scaling(f) for f in train_files])).reshape(-1, 15)
-        Xs_test = np.array(reduce(add, [self.scaling(f) for f in test_files])).reshape(-1, 15)
-        cov_Xs_train, cov_Xs_test = np.cov(Xs_train.T), np.cov(Xs_test.T)
-        u, s, v = np.linalg.svd(Xs_train, full_matrices=False, compute_uv=True)
-        g = np.dot(np.diag(s), v)
-        UG = np.dot(u, np.dot(np.diag(s), v))
-        cov_UG = np.cov(UG.T)
-        dist_UG = np.linalg.norm(cov_UG - cov_Xs_test, ord="fro")
-        dist_train = np.linalg.norm(cov_Xs_train - cov_Xs_test, ord="fro")
-        print("The closeness between matrix CUG and Ctest is %.20f\nThe closeness between matrix Ctrain and Ctest is %.20f\n" % (dist_UG, dist_UG))
+        global files_to_save
+        files_to_save = OrderedDict()
+        pool = ThreadPool(4)  # current cpu processes number
+        train_dfs = pool.map(self.read_txt, self._files[0:410])
+        test_dfs = pool.map(self.read_txt, self._files[410:820])
+        Fs_train = np.array(pool.map(self.process, train_dfs)).reshape(410, 15, 15)
+        Fs_test = np.array(pool.map(self.process, test_dfs)).reshape(410, 15, 15)
+        Fs = np.concatenate((Fs_train, Fs_test), axis=0)
+        files_to_save["Fn"], files_to_save["Fv"] = np.mean(Fs, axis=0).astype("float64"), np.var(Fs, axis=0).astype("float64")
+
+        files_to_save["Ftrain"], files_to_save["Ftest"] = np.mean(Fs_train, axis=0).astype("float64"), np.mean(Fs_test, axis=0).astype("float64")
+        Xs_train = np.array(pool.map(self.scaling, train_dfs)).reshape(-1, 15).astype("float64")
+        Xs_test = np.array(pool.map(self.scaling, test_dfs)).reshape(-1, 15).astype("float64")
+        cov_Xs_train, cov_Xs_test = np.cov(Xs_train.T).astype("float64"), np.cov(Xs_test.T).astype("float64")
+        files_to_save["U"], s, v = np.linalg.svd(Xs_train, full_matrices=False, compute_uv=True)
+        files_to_save["G"] = np.dot(np.diag(s), v).astype("float64")
+        UG = np.dot(files_to_save["U"], np.dot(np.diag(s), v)).astype("float64")
+        files_to_save["CUG"] = np.cov(UG.T).astype("float64")
+        files_to_save["CUGCtest"] = np.array(np.linalg.norm(files_to_save["CUG"] - cov_Xs_test, ord="fro")).reshape(1, 1).astype("float64")
+        files_to_save["CtrainCtest"] = np.array(np.linalg.norm(cov_Xs_train - cov_Xs_test, ord="fro")).reshape(1, 1).astype("float64")
+        print("The closeness between matrix CUG and Ctest is    %.32f\nThe closeness between matrix Ctrain and Ctest is %.32f\n" % (files_to_save["CUGCtest"], files_to_save["CtrainCtest"]))
         print("Until here, elapsed time is %.2fs" % (time.time() - start))
-        np.savetxt("U.csv", u, delimiter=",")
-        np.savetxt("G.csv", g, delimiter=",")
-        np.savetxt("CUG.csv", cov_UG, delimiter=",")
-        np.savetxt("Ctrain.csv", cov_Xs_train, delimiter=",")
-        np.savetxt("Ctest.csv", cov_Xs_test, delimiter=",")
-        np.savetxt("CUGCtest.csv", np.array(dist_UG).reshape(1, 1), delimiter=",")
-        np.savetxt("CtrainCtest.csv", np.array(dist_train).reshape(1, 1), delimiter=",")
+        pool.map(self.save_csv, files_to_save.keys())
         print("HW2 was done!\nElapsed time is %.2fs" % (time.time() - start))
+        pool.close()
+        pool.join()
 
 
 if __name__ == "__main__":
