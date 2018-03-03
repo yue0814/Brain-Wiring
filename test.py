@@ -1,111 +1,86 @@
-# -*- coding = utf-8 -*-
+# -*- coding: utf-8 -*-
 """
-    Spark version of hw2
+Created on Mon Feb 19 2018
+
+@author: Yue Peng, Ludan Zhang, Jiachen Zhang
 """
+import pip
 import os
 import sys
-import time
-import numpy as np
-import pandas as pd
-from operator import add
-from sklearn.preprocessing import scale
-from pyspark import SparkContext, SparkConf
-from pyspark.sql import SparkSession
+pkgs = ['numpy', 'sklearn', 'pandas']
+for package in pkgs:
+    try:
+        import package
+    except ImportError:
+        pip.main(['install', package])
+    finally:
+        import time
+        import numpy as np
+        import pandas as pd
+        from sklearn.preprocessing import scale
+        from multiprocessing.dummy import Pool as ThreadPool
+        from collections import OrderedDict
 
 
 def authors():
     print("@authors: Yue Peng, Ludan Zhang, Jiachen Zhang\n")
 
 
-def scale_each(df):
-    d1 = df.rdd.map(lambda x: (Vectors.dense(x),))
-    d2 = spark.createDataFrame(d1, ["features"])
-    scaler = StandardScaler(withMean=True, withStd=True, inputCol="features", outputCol="scaled")
-    scalerModel = scaler.fit(d2)
-    scale_df = scalerModel.transform(df).select("scaled")
-    return scale_df.rdd.map(lambda x: list(x[0]))
+class BrainD:
 
+    def __init__(self, files):
+        self._files = files
 
-def main(sc):
-    files = sorted([s for s in os.listdir(os.getcwd()) if s.endswith(".txt")])
-    rdd = sc.textFile(",".join(files))
-    mat = rdd.map(lambda line: line.split(" ")).map(lambda x: [*map(float, x)])
-    df = mat.toDF()
-    df.createGlobalTempView("brainD")
-    # spark.sql("select * from global_temp.brainD")
-    # add row number
-    # df2 = spark.sql("select row_number() over (order by (select null)) as rowNum, * from global_temp.brainD")
-    row_begin = [*range(1, 4800 * 819 + 2, 4800)]
-    row_end = [*range(4800, 4800 * 820 + 1, 4800)]
-    dfs = [spark.sql("select * from (select row_number() over (order by (select null)) as rowNum, * from global_temp.brainD) as t where rowNum between %d and %d" % (b, e)).drop("rowNum") for b, e in zip(row_begin, row_end)]
+    def read_txt(self, file):
+        return pd.read_table(file, sep=" ", header=None)
 
+    def process(self, df):
+        corr_mat = np.asarray(df.corr()).astype("float64")
+        np.putmask(corr_mat, corr_mat == 1.0, 0.)
+        return (1 / 2 * np.log(np.divide(1 + corr_mat, 1 - corr_mat))).tolist()
 
-    def fisher_z(row):
-        return [*map(lambda x: 1 / 2 * np.log((1 + x) / (1 - x)) if x != 1.0 else 0., row)]
+    def scaling(self, df):
+        return scale(df).tolist()
 
-    def process(file):
-        df = pd.read_table(file, sep=" ", header=None)
-        corr_mat = np.asarray(df.corr()).tolist()
-        corr_new = [*map(fisher_z, corr_mat)]
-        return corr_new
+    def save_csv(self, name):
+        np.savetxt("%s.csv" % (name), files_to_save[name], delimiter=",", fmt="%f")
 
-    # problem 1
-    corr_new = rdd.map(process)
-    # problem 2
-    Fs = np.array(corr_new.reduce(add)).reshape(820, 15, 15)
-    Fs = np.stack(Fs, axis=2)
-    Fn, Fv = np.mean(Fs, axis=2), np.var(Fs, axis=2)
-    np.savetxt("Fn.csv", Fn, delimiter=",")
-    np.savetxt("Fv.csv", Fv, delimiter=",")
-    # problem 3
-    train_rdd = rdd.filter(lambda x: True if float(x[3:9]) <= 211316 else False)
-    test_rdd = rdd.filter(lambda x: True if float(x[3:9]) > 211316 else False)
-    Fs_train = np.array(train_rdd.map(process).reduce(add)).reshape(410, 15, 15)
-    Fs_test = np.array(test_rdd.map(process).reduce(add)).reshape(410, 15, 15)
-    Fs_train, Fs_test = np.stack(Fs_train, axis=2), np.stack(Fs_test, axis=2)
-    Ftrain, Ftest = np.mean(Fs_train, axis=2), np.mean(Fs_test, axis=2)
-    np.savetxt("Ftrain.csv", Ftrain, delimiter=",")
-    np.savetxt("Ftest.csv", Ftest, delimiter=",")
+    def main(self):
+        global files_to_save
+        files_to_save = OrderedDict()
+        pool = ThreadPool(os.cpu_count() - 1)
+        train_dfs = pool.map(self.read_txt, self._files[0:410])
+        test_dfs = pool.map(self.read_txt, self._files[410:820])
+        Fs_train = np.array(pool.map(self.process, train_dfs)).reshape(410, 15, 15).astype("float64")
+        Fs_test = np.array(pool.map(self.process, test_dfs)).reshape(410, 15, 15).astype("float64")
+        Fs = np.concatenate((Fs_train, Fs_test), axis=0)
+        files_to_save["Fn"], files_to_save["Fv"] = np.mean(Fs, axis=0), np.var(Fs, axis=0)
 
-    # problem 4
-    def scaling(file):
-        X = scale(pd.read_table(file, sep=" ", header=None)).tolist()
-        return X
-
-    Xs = np.array(rdd.map(scaling).reduce(add)).reshape(-1, 15)
-    Xs_train = Xs[0:4800 * 410, :]
-    Xs_test = Xs[4800 * 410:4800 * 820, :]
-    cov_Xs_train, cov_Xs_test = np.cov(Xs_train.T), np.cov(Xs_test.T)
-    u, s, v = np.linalg.svd(Xs_train, full_matrices=False, compute_uv=True)
-    g = np.dot(np.diag(s), v)
-    UG = np.dot(u, np.dot(np.diag(s), v))
-    cov_UG = np.cov(UG.T)
-    dist_UG = np.array(np.linalg.norm(cov_UG - cov_Xs_test, ord="fro")).reshape(1, 1)
-    dist_train = np.array(np.linalg.norm(cov_Xs_train - cov_Xs_test, ord="fro")).reshape(1, 1)
-    print("The closeness between matrix CUG and Ctest is %f\nThe closeness between matrix Ctrain and Ctest is %f\n" % (dist_UG, dist_UG))
-    print("Until here, elapsed time is %.2fs\n" % (time.time() - start))
-    np.savetxt("U.csv", u, delimiter=",")
-    np.savetxt("G.csv", g, delimiter=",")
-    np.savetxt("CUG.csv", cov_UG, delimiter=",")
-    np.savetxt("Ctrain.csv", cov_Xs_train, delimiter=",")
-    np.savetxt("Ctest.csv", cov_Xs_test, delimiter=",")
-    np.savetxt("CUGCtest.csv", dist_UG, delimiter=",")
-    np.savetxt("CtrainCtest.csv", dist_train, delimiter=",")
-    print("HW2 was done!\nElapsed time is %.2fs" % (time.time() - start))
-    sc.stop()
+        files_to_save["Ftrain"], files_to_save["Ftest"] = np.mean(Fs_train, axis=0), np.mean(Fs_test, axis=0)
+        Xs_train = np.array(pool.map(self.scaling, train_dfs)).reshape(-1, 15).astype("float64")
+        Xs_test = np.array(pool.map(self.scaling, test_dfs)).reshape(-1, 15).astype("float64")
+        files_to_save["Ctrain"], files_to_save["Ctest"] = np.cov(Xs_train.T), np.cov(Xs_test.T)
+        files_to_save["U"], s, v = np.linalg.svd(Xs_train, full_matrices=False, compute_uv=True)
+        files_to_save["G"] = np.dot(np.diag(s), v).astype("float64")
+        UG = np.dot(files_to_save["U"], np.dot(np.diag(s), v)).astype("float64")
+        files_to_save["CUG"] = np.cov(UG.T)
+        files_to_save["CUGCtest"] = np.array(np.linalg.norm(files_to_save["CUG"] - files_to_save["Ctest"], ord="fro")).reshape(1, 1)
+        files_to_save["CtrainCtest"] = np.array(np.linalg.norm(files_to_save["Ctrain"] - files_to_save["Ctest"], ord="fro")).reshape(1, 1)
+        print("The closeness between matrix CUG and Ctest is    %.32f\nThe closeness between matrix Ctrain and Ctest is %.32f\n" % (files_to_save["CUGCtest"], files_to_save["CtrainCtest"]))
+        print("Until here, elapsed time is %.2fs" % (time.time() - start))
+        pool.map(self.save_csv, files_to_save.keys())
+        pool.close()
+        pool.join()
 
 
 if __name__ == "__main__":
-    # Configure Spark
-    APP_NAME = "HW2 Spark Application"
-    conf = SparkConf().setAppName(APP_NAME)
-    spark = SparkSession.builder.config(conf=conf).getOrCreate()
-    sc = SparkContext(conf=conf)
-    sc.setLogLevel("WARN")
-    # sqlContext = SQLContext(sc)
+    print("HW2 started...\n")
+    start = time.time()
     if os.path.basename(os.getcwd()) == "brainD15":
         authors()
-        start = time.time()
+        files = sorted([s for s in os.listdir(os.getcwd()) if s.endswith(".txt")])
+        hw2 = BrainD(files)
+        hw2.main()
+        print("HW2 was done!\nElapsed time is %.2fs" % (time.time() - start))
     else:
         sys.exit("You should move your python script into brainD15 folder.\n")
-    main(sc)
