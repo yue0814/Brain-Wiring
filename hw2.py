@@ -50,7 +50,7 @@ class BrainD:
     def main(self):
         global files_to_save
         files_to_save = OrderedDict()
-        pool = ThreadPool(4)  # current cpu processes number
+        pool = ThreadPool(os.cpu_count())  # current cpu processes number
         train_dfs = pool.map(self.read_txt, self._files[0:410])
         test_dfs = pool.map(self.read_txt, self._files[410:820])
         Fs_train = np.array(pool.map(self.process, train_dfs)).reshape(410, 15, 15).astype("float64")
