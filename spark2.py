@@ -85,7 +85,6 @@ def main(sc, files):
     np.savetxt("Ctestp5.csv", cov_Xs_test, delimiter=",")
     np.savetxt("CUGCtestp5.csv", dist_UG, delimiter=",")
     np.savetxt("CtrainCtestp5.csv", dist_train, delimiter=",")
-    print("HW2 was done!\nElapsed time is %.2fs" % (time.time() - start))
     sc.stop()
 
 
@@ -102,6 +101,8 @@ if __name__ == "__main__":
         start = time.time()
         files = sorted([s for s in os.listdir(os.getcwd()) if s.endswith(".txt")])
         main(sc, files)
+        print("HW2 was done!\nElapsed time is %.2fs" % (time.time() - start))
+
     else:
         sys.exit("You should move your python script into brainD15 folder.\n")
     
