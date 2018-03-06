@@ -50,14 +50,14 @@ class BrainD:
         pool = ThreadPool(os.cpu_count())  # current cpu processes number
         train_dfs = pool.map(self.read_txt, self._files[0:410])
         test_dfs = pool.map(self.read_txt, self._files[410:820])
-        Fs_train = np.array(pool.map(self.process, train_dfs)).reshape(410, 15, 15).astype(np.float64)
-        Fs_test = np.array(pool.map(self.process, test_dfs)).reshape(410, 15, 15).astype(np.float64)
+        Fs_train = np.array(pool.map(self.process, train_dfs), dtype=np.float64).reshape(410, 15, 15)
+        Fs_test = np.array(pool.map(self.process, test_dfs), dtype=np.float64).reshape(410, 15, 15)
         Fs = np.concatenate((Fs_train, Fs_test), axis=0)
         files_to_save["Fn"], files_to_save["Fv"] = np.mean(Fs, axis=0), np.var(Fs, axis=0)
 
         files_to_save["Ftrain"], files_to_save["Ftest"] = np.mean(Fs_train, axis=0), np.mean(Fs_test, axis=0)
-        Xs_train = np.array(pool.map(self.scaling, train_dfs)).reshape(-1, 15).astype(np.float64)
-        Xs_test = np.array(pool.map(self.scaling, test_dfs)).reshape(-1, 15).astype(np.float64)
+        Xs_train = np.array(pool.map(self.scaling, train_dfs), dtype=np.float64).reshape(-1, 15)
+        Xs_test = np.array(pool.map(self.scaling, test_dfs), dtype=np.float64).reshape(-1, 15)
         files_to_save["Ctrain"], files_to_save["Ctest"] = np.cov(Xs_train.T), np.cov(Xs_test.T)
         files_to_save["U"], s, v = np.linalg.svd(Xs_train, full_matrices=False, compute_uv=True)
         files_to_save["G"] = np.dot(np.diag(s), v)
