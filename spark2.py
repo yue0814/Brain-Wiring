@@ -55,24 +55,23 @@ def svd_(mat):
 
 def main(sc, files):
 
-    rdd = sc.wholeTextFiles(",".join(files)).persist(StorageLevel.DISK_ONLY)
-    rdd_id = rdd.map(lambda x: (float(x[0][re.search(r"\d{6}", x[0]).span()[0]:re.search(r"\d{6}", x[0]).span()[1]]), x[1])).persist(StorageLevel.DISK_ONLY)
-    lines = rdd_id.mapValues(lambda x: x.rstrip().split("\n")).persist(StorageLevel.DISK_ONLY)
-    mat = lines.mapValues(lambda x: [*map(str.split, x)]).persist(StorageLevel.DISK_ONLY)
-    mat_num = mat.mapValues(lambda x: np.array(x).astype(float)).persist(StorageLevel.DISK_ONLY)
-    scaled_mat = mat_num.mapValues(lambda x: scale(x)).persist(StorageLevel.DISK_ONLY)
-    train = scaled_mat.filter(lambda x: x[0] <= 211316).persist(StorageLevel.DISK_ONLY)
-    test = scaled_mat.filter(lambda x: x[0] > 211316).persist(StorageLevel.DISK_ONLY)
+    rdd = sc.wholeTextFiles(",".join(files)).persist(StorageLevel.MEMORY_AND_DISK_SER)
+    rdd_id = rdd.map(lambda x: (float(x[0][re.search(r"\d{6}", x[0]).span()[0]:re.search(r"\d{6}", x[0]).span()[1]]), x[1])).persist(StorageLevel.MEMORY_AND_DISK_SER)
+    lines = rdd_id.mapValues(lambda x: x.rstrip().split("\n")).persist(StorageLevel.MEMORY_AND_DISK_SER)
+    mat = lines.mapValues(lambda x: [*map(str.split, x)]).persist(StorageLevel.MEMORY_AND_DISK_SER)
+    mat_num = mat.mapValues(lambda x: np.array(x).astype(float)).persist(StorageLevel.MEMORY_AND_DISK_SER)
+    scaled_mat = mat_num.mapValues(lambda x: scale(x)).persist(StorageLevel.MEMORY_AND_DISK_SER)
+    train = scaled_mat.filter(lambda x: x[0] <= 211316).persist(StorageLevel.MEMORY_AND_DISK_SER)
+    test = scaled_mat.filter(lambda x: x[0] > 211316).persist(StorageLevel.MEMORY_AND_DISK_SER)
 
-    Xs_train_mat, Xs_test_mat = train.map(lambda x: ("train", x[1])).persist(StorageLevel.DISK_ONLY), test.map(lambda x: ("test", x[1])).persist(StorageLevel.DISK_ONLY)
-    XsTrain, XsTest = Xs_train_mat.reduceByKey(stack_).persist(StorageLevel.DISK_ONLY), Xs_test_mat.reduceByKey(stack_).persist(StorageLevel.DISK_ONLY)
+    Xs_train_mat, Xs_test_mat = train.map(lambda x: ("train", x[1])).persist(StorageLevel.MEMORY_AND_DISK_SER), test.map(lambda x: ("test", x[1])).persist(StorageLevel.MEMORY_AND_DISK_SER)
+    XsTrain, XsTest = Xs_train_mat.reduceByKey(stack_).persist(StorageLevel.MEMORY_AND_DISK_SER), Xs_test_mat.reduceByKey(stack_).persist(StorageLevel.MEMORY_AND_DISK_SER)
 
-    cov_Xs_train, cov_Xs_test = XsTrain.mapValues(cov_).persist(StorageLevel.DISK_ONLY), XsTest.mapValues(cov_).persist(StorageLevel.DISK_ONLY)
+    cov_Xs_train, cov_Xs_test = XsTrain.mapValues(cov_).persist(StorageLevel.MEMORY_AND_DISK_SER), XsTest.mapValues(cov_).persist(StorageLevel.MEMORY_AND_DISK_SER)
 
     cov_Xs_test.mapValues(toCSV)
-    XsTrain_svd = XsTrain.mapValues(svd_).persist(StorageLevel.DISK_ONLY)
+    XsTrain_svd = XsTrain.mapValues(svd_).persist(StorageLevel.MEMORY_AND_DISK_SER)
 
-   
     cov_UG = np.cov(UG.T)
     dist_UG = np.array(np.linalg.norm(cov_UG - cov_Xs_test, ord="fro")).reshape(1, 1)
     dist_train = np.array(np.linalg.norm(cov_Xs_train - cov_Xs_test, ord="fro")).reshape(1, 1)
@@ -105,4 +104,4 @@ if __name__ == "__main__":
 
     else:
         sys.exit("You should move your python script into brainD15 folder.\n")
-    
+
