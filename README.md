@@ -4,7 +4,7 @@ A group of scientists measure brain activitives from 15 brain regions of 820 sub
 <html>
 <div id="header">
 <h1 class="title">Stat Learning and Big Data: Homework 2</h1>
-<h2 class="author">Instructor: Xi Luo</h2>
+<h2 class="author">Student: Yue Peng</h2>
 </div>
 <div id="TOC">
 <ul>
