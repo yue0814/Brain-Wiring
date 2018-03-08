@@ -41,5 +41,6 @@ object Extract {
     val mat_test = mat_scaled.filter(_._1 > 211316).map(x => ("test", x._2)).persist(StorageLevel.DISK_ONLY)
     val XsTrain = mat_train.reduceByKey(_ ++ _).persist(StorageLevel.DISK_ONLY)
     val XsTest = mat_test.reduceByKey(_ ++ _).persist(StorageLevel.DISK_ONLY)
+    
   }
 }
