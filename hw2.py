@@ -54,7 +54,6 @@ class BrainD:
         Fs_test = np.array(pool.map(self.process, test_dfs), dtype=np.float64).reshape(410, 15, 15)
         Fs = np.concatenate((Fs_train, Fs_test), axis=0)
         files_to_save["Fn"], files_to_save["Fv"] = np.mean(Fs, axis=0), np.var(Fs, axis=0)
-
         files_to_save["Ftrain"], files_to_save["Ftest"] = np.mean(Fs_train, axis=0), np.mean(Fs_test, axis=0)
         Xs_train = np.array(pool.map(self.scaling, train_dfs), dtype=np.float64).reshape(-1, 15)
         Xs_test = np.array(pool.map(self.scaling, test_dfs), dtype=np.float64).reshape(-1, 15)
