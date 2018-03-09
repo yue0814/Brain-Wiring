@@ -4,7 +4,7 @@
 		module="hw2$sources"
 		revision="0.1"
 		status="integration"
-		publication="20180308144703"
+		publication="20180309093617"
 	/>
 	<configurations>
 		<conf name="compile" visibility="public" description=""/>

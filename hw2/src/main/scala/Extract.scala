@@ -1,8 +1,11 @@
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.storage.StorageLevel
-import java.io.{File, PrintWriter}
+import java.io.{File, FileWriter, BufferedWriter, PrintWriter} // StringWriter
 import breeze.linalg.{DenseMatrix, svd, diag} //DenseVector, convert, cov
 import breeze.stats.covmat
+import au.com.bytecode.opencsv.CSVWriter
+import scala.collection.JavaConverters._
+
 //import scala.math
 //import breeze.linalg._
 
@@ -44,16 +47,25 @@ object Extract {
     math.sqrt(mat.mapValues(x => math.pow(x, 2)).toArray.reduce(_ + _))
   }
 
-  def denseToCsv(mat: DenseMatrix[Double]): Array[String] = {
-    mat.toString.split("\n").map(_.split("\\s+")).map(_.mkString(","))
+  def denseToCSV(mat: DenseMatrix[Double]): java.util.List[Array[String]] = {
+    mat.toString.split("\n").map(_.split("\\s+")).toList.asJava
   }
 
-
+  def saveCSV(list: java.util.List[Array[String]], s:String): Unit = {
+    val out = new BufferedWriter(new FileWriter(System.getProperty("user.dir") + "/" + s + ".csv"))
+    val writer = new CSVWriter(out)
+    writer.writeAll(list)
+    writer.close()
+  }
+  
   def main(args: Array[String]): Unit = {
     val conf = new SparkConf()
     conf.setAppName("Spark version of HW2")
     conf.setMaster("local[*]")
     conf.set("spark.memory.offHeap.enabled", "true")
+    conf.set("spark.executor.memory", "4g")
+    conf.set("spark.memory.fraction", "0.2")
+    conf.set("spark.memory.offHeap.size", "2")
     val sc = new SparkContext(conf)
     sc.setLogLevel("WARN")
     val files_in_dir = new File(System.getProperty("user.dir"))
@@ -88,38 +100,29 @@ object Extract {
     val CUGCtest = CUG_Ctest.mapValues(x => normFrobenius(x))
     val CtrainCtest = Ctrain_Ctest.mapValues(x => normFrobenius(x))
 
-    val writerU = new PrintWriter(new File("U.csv"))
-    val U_csv = U.mapValues(denseToCsv(_))
-    U_csv.mapValues(_.foreach(x => writerU.write(x + "\n")))
-    writerU.close()
 
-    val writerG = new PrintWriter(new File("G.csv"))
-    val G_csv = G.mapValues(denseToCsv(_))
-    G_csv.mapValues(_.foreach(x => writerG.write(x + "\n")))
-    writerG.close()
+    val U_csv = U.mapValues(denseToCSV(_))
+    saveCSV(U_csv.map(_._2).collect()(0), "Up5")
 
-    val writerCUG = new PrintWriter(new File("CUG.csv"))
-    val CUG_csv = CUG.mapValues(denseToCsv(_))
-    CUG_csv.mapValues(_.foreach(x => writerCUG.write(x + "\n")))
-    writerCUG.close()
+    val G_csv = G.mapValues(denseToCSV(_))
+    saveCSV(G_csv.map(_._2).collect()(0), "Gp5")
 
-    val writerCtrain = new PrintWriter(new File("Ctrain.csv"))
-    val Ctrain_csv = Ctrain.mapValues(denseToCsv(_))
-    Ctrain_csv.mapValues(_.foreach(x => writerCtrain.write(x + "\n")))
-    writerCtrain.close()
+    val CUG_csv = CUG.mapValues(denseToCSV(_))
+    saveCSV(CUG_csv.map(_._2).collect()(0), "CUGp5")
 
-    val writerCtest = new PrintWriter(new File("Ctest.csv"))
-    val Ctest_csv = Ctest.mapValues(denseToCsv(_))
-    Ctest_csv.mapValues(_.foreach(x => writerCtest.write(x + "\n")))
-    writerCtest.close()
+    val Ctrain_csv = Ctrain.mapValues(denseToCSV(_))
+    saveCSV(Ctrain_csv.map(_._2).collect()(0), "Ctrainp5")
 
-    val writerCUGCtest = new PrintWriter(new File("CUGCtest.csv"))
-    CUGCtest.mapValues(x => writerU.write(x.toString + "\n"))
+    val Ctest_csv = Ctest.mapValues(denseToCSV(_))
+    saveCSV(Ctest_csv.map(_._2).collect()(0), "Ctestp5")
+
+    val writerCUGCtest = new PrintWriter(new File("CUGCtestp5.csv"))
+    writerCUGCtest.write(CUGCtest.collect()(0)._2.toString + "\n")
     writerCUGCtest.close()
 
-    val writerCtrainCtest = new PrintWriter(new File("CtrainCtest.csv"))
-    CtrainCtest.mapValues(x => writerU.write(x.toString + "\n"))
+    val writerCtrainCtest = new PrintWriter(new File("CtrainCtestp5.csv"))
+    writerCtrainCtest.write(CtrainCtest.collect()(0)._2.toString + "\n")
     writerCtrainCtest.close()
-
+    sc.stop()
   }
 }
