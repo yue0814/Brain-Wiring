@@ -2,18 +2,18 @@
 """
 Created on Mon Feb 19 2018
 
-@author: Yue Peng, Ludan Zhang, Jiachen Zhang
+@author: Yue Peng
 """
 import pip
 import os
 import time
 import sys
-pkgs = ['numpy', 'scipy', 'sklearn', 'pandas']
+pkgs = ['numpy', 'sklearn', 'pandas']
 for package in pkgs:
     try:
         import package
     except ImportError:
-        pip.main(['install', package])
+        pip.main(['install', package, "--upgrade"])
     finally:
         import numpy as np
         import pandas as pd
@@ -28,7 +28,7 @@ class BrainD:
         self._files = sorted(files)
 
     def authors(self):
-        print("@authors: Yue Peng, Ludan Zhang, Jiachen Zhang\n")
+        print("@authors: Yue Peng\n")
 
     def read_txt(self, file):
         return pd.read_table(file, sep=" ", header=None)

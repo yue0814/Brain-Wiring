@@ -12,7 +12,7 @@ from pyspark import SparkContext, SparkConf
 
 
 def authors():
-    print("@authors: Yue Peng, Ludan Zhang, Jiachen Zhang\n")
+    print("@authors: Yue Peng\n")
 
 
 def main(sc):

@@ -2,7 +2,7 @@
 """
 Created on Mon Feb 19 2018
 
-@author: Yue Peng, Ludan Zhang, Jiachen Zhang
+@author: Yue Peng
 """
 import pip
 import os
@@ -22,7 +22,7 @@ for package in pkgs:
 
 
 def authors():
-    print("@authors: Yue Peng, Ludan Zhang, Jiachen Zhang\n")
+    print("@authors: Yue Peng\n")
 
 
 class BrainD:
